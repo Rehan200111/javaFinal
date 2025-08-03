@@ -1,209 +1,614 @@
-// === Main.java ===
-import javafx.application.Application;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
-public class Main extends Application {
-    private List<Course> courses = new ArrayList<>();
-    private List<Assignment> assignments = new ArrayList<>();
-    private List<StudySession> studySessions = new ArrayList<>();
-    private VBox dashboardBox;
-
-    public static void main(String[] args) {
-        launch(args);
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
+import java.util.Comparator;
+// ===== Course Class =====
+class Course {
+    private String id;
+    private String name;
+    private String instructor;
+    private String schedule;
+    public Course(String id, String name, String instructor, String schedule) {
+        this.id = id;
+        this.name = name;
+        this.instructor = instructor;
+        this.schedule = schedule;
     }
-
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getInstructor() { return instructor; }
+    public String getSchedule() { return schedule; }
     @Override
-    public void start(Stage primaryStage) {
-        primaryStage.setTitle("Study Planner & Homework Tracker");
-
-        dashboardBox = new VBox(10);
-        dashboardBox.setPadding(new Insets(10));
-
-        Button addCourseBtn = new Button("Add Course");
-        Button addAssignmentBtn = new Button("Add Assignment");
-        Button addStudySessionBtn = new Button("Add Study Session");
-
-        addCourseBtn.setOnAction(e -> showAddCourseDialog());
-        addAssignmentBtn.setOnAction(e -> showAddAssignmentDialog());
-        addStudySessionBtn.setOnAction(e -> showAddStudySessionDialog());
-
-        HBox buttonBox = new HBox(10, addCourseBtn, addAssignmentBtn, addStudySessionBtn);
-        dashboardBox.getChildren().add(buttonBox);
-        updateDashboard();
-
-        Scene scene = new Scene(dashboardBox, 600, 500);
-        primaryStage.setScene(scene);
-        primaryStage.show();
+    public String toString() {
+        return name + " (" + instructor + " - " + schedule + ")";
     }
-
-    private void showAddCourseDialog() {
-        Dialog<Course> dialog = new Dialog<>();
-        dialog.setTitle("Add Course");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
-
-        TextField nameField = new TextField();
-        TextField instructorField = new TextField();
-        TextField scheduleField = new TextField();
-
-        grid.add(new Label("Course Name:"), 0, 0);
-        grid.add(nameField, 1, 0);
-        grid.add(new Label("Instructor:"), 0, 1);
-        grid.add(instructorField, 1, 1);
-        grid.add(new Label("Schedule:"), 0, 2);
-        grid.add(scheduleField, 1, 2);
-
-        dialog.getDialogPane().setContent(grid);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        dialog.setResultConverter(dialogButton -> {
-            if (dialogButton == ButtonType.OK) {
-                return new Course(nameField.getText(), instructorField.getText(), scheduleField.getText());
+}
+// ===== Assignment Class =====
+class Assignment {
+    private String id;
+    private String title;
+    private String courseId;
+    private LocalDate dueDate;
+    private String description;
+    private String priority;
+    public Assignment(String id, String title, String courseId, LocalDate dueDate, String description, String priority) {
+        this.id = id;
+        this.title = title;
+        this.courseId = courseId;
+        this.dueDate = dueDate;
+        this.description = description;
+        this.priority = priority;
+    }
+    public String getId() { return id; }
+    public String getTitle() { return title; }
+    public String getCourseId() { return courseId; }
+    public LocalDate getDueDate() { return dueDate; }
+    public String getDescription() { return description; }
+    public String getPriority() { return priority; }
+    @Override
+    public String toString() {
+        return title + " (" + priority + " priority) - Due: " + dueDate + " [Course ID: " + courseId + "]";
+    }
+}
+// ===== Study Session Class =====
+class StudySession {
+    private String id;
+    private String courseId;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
+    private String topic;
+    public StudySession(String id, String courseId, LocalDateTime startTime, LocalDateTime endTime, String topic) {
+        this.id = id;
+        this.courseId = courseId;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.topic = topic;
+    }
+    public String getId() { return id; }
+    public String getCourseId() { return courseId; }
+    public LocalDateTime getStartTime() { return startTime; }
+    public LocalDateTime getEndTime() { return endTime; }
+    public String getTopic() { return topic; }
+    @Override
+    public String toString() {
+        String topicStr = topic != null && !topic.isEmpty() ? " - " + topic : "";
+        return "Study Session" + topicStr + ": " + startTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")) + 
+               " to " + endTime.format(DateTimeFormatter.ofPattern("h:mm a")) + " [Course ID: " + courseId + "]";
+    }
+}
+// ===== Main Student Management System =====
+public class StudentManagementSystem {
+    private static List<Course> courses = new ArrayList<>();
+    private static List<Assignment> assignments = new ArrayList<>();
+    private static List<StudySession> sessions = new ArrayList<>();
+    private static Scanner scanner = new Scanner(System.in);
+    private static int idCounter = 1;
+    public static void main(String[] args) {
+        System.out.println("=== Student Academic Management System ===");
+        System.out.println("Welcome to your academic planner!");
+        
+        while (true) {
+            displayMainMenu();
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1": showDashboard(); break;
+                case "2": manageCourses(); break;
+                case "3": manageAssignments(); break;
+                case "4": manageStudySessions(); break;
+                case "5": 
+                    System.out.println("Thank you for using Academic Planner!");
+                    System.exit(0); 
+                    break;
+                default: 
+                    System.out.println("Invalid choice. Please try again.");
             }
-            return null;
-        });
-
-        dialog.showAndWait().ifPresent(course -> {
-            courses.add(course);
-            updateDashboard();
-        });
+        }
     }
-
-    private void showAddAssignmentDialog() {
+    private static void displayMainMenu() {
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("           ACADEMIC PLANNER - MAIN MENU");
+        System.out.println("=".repeat(50));
+        System.out.println("1. Dashboard");
+        System.out.println("2. Manage Courses");
+        System.out.println("3. Manage Assignments");
+        System.out.println("4. Manage Study Sessions");
+        System.out.println("5. Exit");
+        System.out.print("Enter your choice (1-5): ");
+    }
+    // ===== DASHBOARD =====
+    private static void showDashboard() {
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("                  DASHBOARD");
+        System.out.println("=".repeat(50));
+        
+        // Summary stats
+        System.out.println("📊 OVERVIEW:");
+        System.out.println("   Courses: " + courses.size());
+        System.out.println("   Assignments: " + assignments.size());
+        System.out.println("   Study Sessions: " + sessions.size());
+        System.out.println();
+        // Upcoming assignments (next 3)
+        List<Assignment> upcomingAssignments = assignments.stream()
+            .filter(a -> a.getDueDate().isAfter(LocalDate.now()) || a.getDueDate().equals(LocalDate.now()))
+            .sorted(Comparator.comparing(Assignment::getDueDate))
+            .limit(3)
+            .collect(Collectors.toList());
+        System.out.println("📋 UPCOMING ASSIGNMENTS:");
+        if (upcomingAssignments.isEmpty()) {
+            System.out.println("   No upcoming assignments");
+        } else {
+            for (Assignment assignment : upcomingAssignments) {
+                Course course = findCourseById(assignment.getCourseId());
+                String courseName = course != null ? course.getName() : "Unknown Course";
+                System.out.println("   • " + assignment.getTitle() + " (" + assignment.getPriority().toUpperCase() + ")");
+                System.out.println("     Course: " + courseName + " | Due: " + assignment.getDueDate());
+            }
+        }
+        System.out.println();
+        // Today's study sessions
+        List<StudySession> todaySessions = sessions.stream()
+            .filter(s -> s.getStartTime().toLocalDate().equals(LocalDate.now()))
+            .sorted(Comparator.comparing(StudySession::getStartTime))
+            .collect(Collectors.toList());
+        System.out.println("📅 TODAY'S STUDY SESSIONS:");
+        if (todaySessions.isEmpty()) {
+            System.out.println("   No study sessions scheduled for today");
+        } else {
+            for (StudySession session : todaySessions) {
+                Course course = findCourseById(session.getCourseId());
+                String courseName = course != null ? course.getName() : "Unknown Course";
+                String topic = session.getTopic() != null ? " - " + session.getTopic() : "";
+                System.out.println("   • " + courseName + topic);
+                System.out.println("     Time: " + session.getStartTime().format(DateTimeFormatter.ofPattern("h:mm a")) + 
+                                 " - " + session.getEndTime().format(DateTimeFormatter.ofPattern("h:mm a")));
+            }
+        }
+        System.out.println("\nPress Enter to continue...");
+        scanner.nextLine();
+    }
+    // ===== COURSE MANAGEMENT =====
+    private static void manageCourses() {
+        while (true) {
+            System.out.println("\n" + "=".repeat(50));
+            System.out.println("               COURSE MANAGEMENT");
+            System.out.println("=".repeat(50));
+            System.out.println("1. View All Courses");
+            System.out.println("2. Add Course");
+            System.out.println("3. Delete Course");
+            System.out.println("4. Back to Main Menu");
+            System.out.print("Choice: ");
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1": viewAllCourses(); break;
+                case "2": addCourse(); break;
+                case "3": deleteCourse(); break;
+                case "4": return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    private static void viewAllCourses() {
+        System.out.println("\n📚 ALL COURSES:");
         if (courses.isEmpty()) {
-            showAlert("No courses available. Please add a course first.");
+            System.out.println("No courses created yet.");
+        } else {
+            for (int i = 0; i < courses.size(); i++) {
+                Course course = courses.get(i);
+                long assignmentCount = assignments.stream().filter(a -> a.getCourseId().equals(course.getId())).count();
+                System.out.println((i + 1) + ". " + course);
+                System.out.println("   ID: " + course.getId() + " | Assignments: " + assignmentCount);
+            }
+        }
+        System.out.println("\nPress Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void addCourse() {
+        System.out.println("\n➕ ADD NEW COURSE");
+        System.out.print("Course Name: ");
+        String name = scanner.nextLine().trim();
+        if (name.isEmpty()) {
+            System.out.println("Course name cannot be empty.");
             return;
         }
-
-        Dialog<Assignment> dialog = new Dialog<>();
-        dialog.setTitle("Add Assignment");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
-
-        TextField titleField = new TextField();
-        ComboBox<Course> courseBox = new ComboBox<>();
-        courseBox.getItems().addAll(courses);
-        DatePicker dueDatePicker = new DatePicker();
-        TextField descField = new TextField();
-        ComboBox<String> priorityBox = new ComboBox<>();
-        priorityBox.getItems().addAll("Low", "Medium", "High");
-
-        grid.add(new Label("Title:"), 0, 0);
-        grid.add(titleField, 1, 0);
-        grid.add(new Label("Course:"), 0, 1);
-        grid.add(courseBox, 1, 1);
-        grid.add(new Label("Due Date:"), 0, 2);
-        grid.add(dueDatePicker, 1, 2);
-        grid.add(new Label("Description:"), 0, 3);
-        grid.add(descField, 1, 3);
-        grid.add(new Label("Priority:"), 0, 4);
-        grid.add(priorityBox, 1, 4);
-
-        dialog.getDialogPane().setContent(grid);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        dialog.setResultConverter(button -> {
-            if (button == ButtonType.OK) {
-                return new Assignment(titleField.getText(), courseBox.getValue(), dueDatePicker.getValue(),
-                        descField.getText(), priorityBox.getValue());
-            }
-            return null;
-        });
-
-        dialog.showAndWait().ifPresent(assignment -> {
-            assignments.add(assignment);
-            updateDashboard();
-        });
-    }
-
-    private void showAddStudySessionDialog() {
-        if (courses.isEmpty()) {
-            showAlert("No courses available. Please add a course first.");
+        
+        System.out.print("Instructor: ");
+        String instructor = scanner.nextLine().trim();
+        if (instructor.isEmpty()) {
+            System.out.println("Instructor name cannot be empty.");
             return;
         }
-
-        Dialog<StudySession> dialog = new Dialog<>();
-        dialog.setTitle("Add Study Session");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
-
-        ComboBox<Course> courseBox = new ComboBox<>();
-        courseBox.getItems().addAll(courses);
-        DatePicker startDate = new DatePicker();
-        TextField startTime = new TextField();
-        DatePicker endDate = new DatePicker();
-        TextField endTime = new TextField();
-
-        grid.add(new Label("Course:"), 0, 0);
-        grid.add(courseBox, 1, 0);
-        grid.add(new Label("Start Date:"), 0, 1);
-        grid.add(startDate, 1, 1);
-        grid.add(new Label("Start Time (HH:MM):"), 0, 2);
-        grid.add(startTime, 1, 2);
-        grid.add(new Label("End Date:"), 0, 3);
-        grid.add(endDate, 1, 3);
-        grid.add(new Label("End Time (HH:MM):"), 0, 4);
-        grid.add(endTime, 1, 4);
-
-        dialog.getDialogPane().setContent(grid);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        dialog.setResultConverter(button -> {
-            if (button == ButtonType.OK) {
-                try {
-                    LocalDateTime start = LocalDateTime.of(startDate.getValue(),
-                            java.time.LocalTime.parse(startTime.getText()));
-                    LocalDateTime end = LocalDateTime.of(endDate.getValue(),
-                            java.time.LocalTime.parse(endTime.getText()));
-                    return new StudySession(courseBox.getValue(), start, end);
-                } catch (Exception e) {
-                    showAlert("Invalid date/time format.");
-                    return null;
-                }
+        
+        System.out.print("Schedule (e.g., Mon, Wed, Fri 10:00 AM - 11:30 AM): ");
+        String schedule = scanner.nextLine().trim();
+        if (schedule.isEmpty()) {
+            System.out.println("Schedule cannot be empty.");
+            return;
+        }
+        String id = "course-" + (idCounter++);
+        Course course = new Course(id, name, instructor, schedule);
+        courses.add(course);
+        System.out.println("✅ Course added successfully! ID: " + id);
+    }
+    private static void deleteCourse() {
+        if (courses.isEmpty()) {
+            System.out.println("No courses to delete.");
+            return;
+        }
+        viewAllCourses();
+        System.out.print("Enter course number to delete (or 0 to cancel): ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+            if (index == -1) return;
+            if (index < 0 || index >= courses.size()) {
+                System.out.println("Invalid course number.");
+                return;
             }
+            Course course = courses.get(index);
+            System.out.print("Are you sure you want to delete '" + course.getName() + "'? (y/N): ");
+            String confirm = scanner.nextLine().trim().toLowerCase();
+            
+            if (confirm.equals("y") || confirm.equals("yes")) {
+                // Delete associated assignments and study sessions
+                assignments.removeIf(a -> a.getCourseId().equals(course.getId()));
+                sessions.removeIf(s -> s.getCourseId().equals(course.getId()));
+                courses.remove(index);
+                System.out.println("✅ Course and all associated data deleted successfully.");
+            } else {
+                System.out.println("Deletion cancelled.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number.");
+        }
+    }
+    // ===== ASSIGNMENT MANAGEMENT =====
+    private static void manageAssignments() {
+        while (true) {
+            System.out.println("\n" + "=".repeat(50));
+            System.out.println("             ASSIGNMENT MANAGEMENT");
+            System.out.println("=".repeat(50));
+            System.out.println("1. View All Assignments");
+            System.out.println("2. View Assignments by Priority");
+            System.out.println("3. View Assignments by Course");
+            System.out.println("4. Add Assignment");
+            System.out.println("5. Delete Assignment");
+            System.out.println("6. Back to Main Menu");
+            System.out.print("Choice: ");
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1": viewAllAssignments(); break;
+                case "2": viewAssignmentsByPriority(); break;
+                case "3": viewAssignmentsByCourse(); break;
+                case "4": addAssignment(); break;
+                case "5": deleteAssignment(); break;
+                case "6": return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    private static void viewAllAssignments() {
+        System.out.println("\n📝 ALL ASSIGNMENTS:");
+        if (assignments.isEmpty()) {
+            System.out.println("No assignments created yet.");
+        } else {
+            assignments.stream()
+                .sorted(Comparator.comparing(Assignment::getDueDate))
+                .forEach(assignment -> {
+                    Course course = findCourseById(assignment.getCourseId());
+                    String courseName = course != null ? course.getName() : "Unknown Course";
+                    System.out.println("• " + assignment.getTitle() + " (" + assignment.getPriority().toUpperCase() + ")");
+                    System.out.println("  Course: " + courseName + " | Due: " + assignment.getDueDate());
+                    if (assignment.getDescription() != null && !assignment.getDescription().isEmpty()) {
+                        System.out.println("  Description: " + assignment.getDescription());
+                    }
+                    System.out.println();
+                });
+        }
+        System.out.println("Press Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void viewAssignmentsByPriority() {
+        System.out.print("Enter priority (high/medium/low): ");
+        String priority = scanner.nextLine().trim().toLowerCase();
+        
+        List<Assignment> filtered = assignments.stream()
+            .filter(a -> a.getPriority().equalsIgnoreCase(priority))
+            .sorted(Comparator.comparing(Assignment::getDueDate))
+            .collect(Collectors.toList());
+        System.out.println("\n📝 " + priority.toUpperCase() + " PRIORITY ASSIGNMENTS:");
+        if (filtered.isEmpty()) {
+            System.out.println("No " + priority + " priority assignments found.");
+        } else {
+            filtered.forEach(assignment -> {
+                Course course = findCourseById(assignment.getCourseId());
+                String courseName = course != null ? course.getName() : "Unknown Course";
+                System.out.println("• " + assignment.getTitle());
+                System.out.println("  Course: " + courseName + " | Due: " + assignment.getDueDate());
+            });
+        }
+        System.out.println("\nPress Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void viewAssignmentsByCourse() {
+        if (courses.isEmpty()) {
+            System.out.println("No courses available.");
+            return;
+        }
+        System.out.println("\nSelect a course:");
+        for (int i = 0; i < courses.size(); i++) {
+            System.out.println((i + 1) + ". " + courses.get(i).getName());
+        }
+        System.out.print("Choice: ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+            if (index < 0 || index >= courses.size()) {
+                System.out.println("Invalid course selection.");
+                return;
+            }
+            Course selectedCourse = courses.get(index);
+            List<Assignment> courseAssignments = assignments.stream()
+                .filter(a -> a.getCourseId().equals(selectedCourse.getId()))
+                .sorted(Comparator.comparing(Assignment::getDueDate))
+                .collect(Collectors.toList());
+            System.out.println("\n📝 ASSIGNMENTS FOR: " + selectedCourse.getName());
+            if (courseAssignments.isEmpty()) {
+                System.out.println("No assignments for this course.");
+            } else {
+                courseAssignments.forEach(assignment -> {
+                    System.out.println("• " + assignment.getTitle() + " (" + assignment.getPriority().toUpperCase() + ")");
+                    System.out.println("  Due: " + assignment.getDueDate());
+                    if (assignment.getDescription() != null && !assignment.getDescription().isEmpty()) {
+                        System.out.println("  Description: " + assignment.getDescription());
+                    }
+                    System.out.println();
+                });
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input.");
+        }
+        System.out.println("Press Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void addAssignment() {
+        if (courses.isEmpty()) {
+            System.out.println("Please add a course first.");
+            return;
+        }
+        System.out.println("\n➕ ADD NEW ASSIGNMENT");
+        System.out.print("Assignment Title: ");
+        String title = scanner.nextLine().trim();
+        if (title.isEmpty()) {
+            System.out.println("Title cannot be empty.");
+            return;
+        }
+        Course course = selectCourse();
+        if (course == null) return;
+        System.out.print("Due Date (YYYY-MM-DD): ");
+        String dueDateStr = scanner.nextLine().trim();
+        LocalDate dueDate;
+        try {
+            dueDate = LocalDate.parse(dueDateStr);
+        } catch (Exception e) {
+            System.out.println("Invalid date format. Please use YYYY-MM-DD.");
+            return;
+        }
+        System.out.print("Priority (high/medium/low): ");
+        String priority = scanner.nextLine().trim().toLowerCase();
+        if (!priority.equals("high") && !priority.equals("medium") && !priority.equals("low")) {
+            System.out.println("Priority must be: high, medium, or low.");
+            return;
+        }
+        System.out.print("Description (optional): ");
+        String description = scanner.nextLine().trim();
+        String id = "assignment-" + (idCounter++);
+        Assignment assignment = new Assignment(id, title, course.getId(), dueDate, 
+                                             description.isEmpty() ? null : description, priority);
+        assignments.add(assignment);
+        System.out.println("✅ Assignment added successfully! ID: " + id);
+    }
+    private static void deleteAssignment() {
+        if (assignments.isEmpty()) {
+            System.out.println("No assignments to delete.");
+            return;
+        }
+        System.out.println("\nSelect assignment to delete:");
+        for (int i = 0; i < assignments.size(); i++) {
+            Assignment assignment = assignments.get(i);
+            Course course = findCourseById(assignment.getCourseId());
+            String courseName = course != null ? course.getName() : "Unknown Course";
+            System.out.println((i + 1) + ". " + assignment.getTitle() + " - " + courseName);
+        }
+        System.out.print("Enter assignment number (or 0 to cancel): ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+            if (index == -1) return;
+            if (index < 0 || index >= assignments.size()) {
+                System.out.println("Invalid assignment number.");
+                return;
+            }
+            Assignment assignment = assignments.get(index);
+            System.out.print("Are you sure you want to delete '" + assignment.getTitle() + "'? (y/N): ");
+            String confirm = scanner.nextLine().trim().toLowerCase();
+            
+            if (confirm.equals("y") || confirm.equals("yes")) {
+                assignments.remove(index);
+                System.out.println("✅ Assignment deleted successfully.");
+            } else {
+                System.out.println("Deletion cancelled.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number.");
+        }
+    }
+    // ===== STUDY SESSION MANAGEMENT =====
+    private static void manageStudySessions() {
+        while (true) {
+            System.out.println("\n" + "=".repeat(50));
+            System.out.println("           STUDY SESSION MANAGEMENT");
+            System.out.println("=".repeat(50));
+            System.out.println("1. View All Study Sessions");
+            System.out.println("2. View Today's Sessions");
+            System.out.println("3. Add Study Session");
+            System.out.println("4. Delete Study Session");
+            System.out.println("5. Back to Main Menu");
+            System.out.print("Choice: ");
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1": viewAllStudySessions(); break;
+                case "2": viewTodaysSessions(); break;
+                case "3": addStudySession(); break;
+                case "4": deleteStudySession(); break;
+                case "5": return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    private static void viewAllStudySessions() {
+        System.out.println("\n📚 ALL STUDY SESSIONS:");
+        if (sessions.isEmpty()) {
+            System.out.println("No study sessions scheduled yet.");
+        } else {
+            sessions.stream()
+                .sorted(Comparator.comparing(StudySession::getStartTime))
+                .forEach(session -> {
+                    Course course = findCourseById(session.getCourseId());
+                    String courseName = course != null ? course.getName() : "Unknown Course";
+                    String topic = session.getTopic() != null ? " - " + session.getTopic() : "";
+                    System.out.println("• " + courseName + topic);
+                    System.out.println("  Date: " + session.getStartTime().format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
+                    System.out.println("  Time: " + session.getStartTime().format(DateTimeFormatter.ofPattern("h:mm a")) + 
+                                     " - " + session.getEndTime().format(DateTimeFormatter.ofPattern("h:mm a")));
+                    System.out.println();
+                });
+        }
+        System.out.println("Press Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void viewTodaysSessions() {
+        List<StudySession> todaySessions = sessions.stream()
+            .filter(s -> s.getStartTime().toLocalDate().equals(LocalDate.now()))
+            .sorted(Comparator.comparing(StudySession::getStartTime))
+            .collect(Collectors.toList());
+        System.out.println("\n📅 TODAY'S STUDY SESSIONS:");
+        if (todaySessions.isEmpty()) {
+            System.out.println("No study sessions scheduled for today.");
+        } else {
+            todaySessions.forEach(session -> {
+                Course course = findCourseById(session.getCourseId());
+                String courseName = course != null ? course.getName() : "Unknown Course";
+                String topic = session.getTopic() != null ? " - " + session.getTopic() : "";
+                System.out.println("• " + courseName + topic);
+                System.out.println("  Time: " + session.getStartTime().format(DateTimeFormatter.ofPattern("h:mm a")) + 
+                                 " - " + session.getEndTime().format(DateTimeFormatter.ofPattern("h:mm a")));
+                System.out.println();
+            });
+        }
+        System.out.println("Press Enter to continue...");
+        scanner.nextLine();
+    }
+    private static void addStudySession() {
+        if (courses.isEmpty()) {
+            System.out.println("Please add a course first.");
+            return;
+        }
+        System.out.println("\n➕ SCHEDULE STUDY SESSION");
+        Course course = selectCourse();
+        if (course == null) return;
+        System.out.print("Topic (optional): ");
+        String topic = scanner.nextLine().trim();
+        System.out.print("Start Date & Time (YYYY-MM-DD HH:MM): ");
+        String startStr = scanner.nextLine().trim();
+        LocalDateTime startTime;
+        try {
+            startTime = LocalDateTime.parse(startStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        } catch (Exception e) {
+            System.out.println("Invalid date/time format. Please use YYYY-MM-DD HH:MM.");
+            return;
+        }
+        System.out.print("End Date & Time (YYYY-MM-DD HH:MM): ");
+        String endStr = scanner.nextLine().trim();
+        LocalDateTime endTime;
+        try {
+            endTime = LocalDateTime.parse(endStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        } catch (Exception e) {
+            System.out.println("Invalid date/time format. Please use YYYY-MM-DD HH:MM.");
+            return;
+        }
+        if (endTime.isBefore(startTime) || endTime.equals(startTime)) {
+            System.out.println("End time must be after start time.");
+            return;
+        }
+        String id = "session-" + (idCounter++);
+        StudySession session = new StudySession(id, course.getId(), startTime, endTime, 
+                                              topic.isEmpty() ? null : topic);
+        sessions.add(session);
+        System.out.println("✅ Study session scheduled successfully! ID: " + id);
+    }
+    private static void deleteStudySession() {
+        if (sessions.isEmpty()) {
+            System.out.println("No study sessions to delete.");
+            return;
+        }
+        System.out.println("\nSelect study session to delete:");
+        for (int i = 0; i < sessions.size(); i++) {
+            StudySession session = sessions.get(i);
+            Course course = findCourseById(session.getCourseId());
+            String courseName = course != null ? course.getName() : "Unknown Course";
+            String topic = session.getTopic() != null ? " - " + session.getTopic() : "";
+            System.out.println((i + 1) + ". " + courseName + topic + 
+                             " (" + session.getStartTime().format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) + ")");
+        }
+        System.out.print("Enter session number (or 0 to cancel): ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+            if (index == -1) return;
+            if (index < 0 || index >= sessions.size()) {
+                System.out.println("Invalid session number.");
+                return;
+            }
+            StudySession session = sessions.get(index);
+            Course course = findCourseById(session.getCourseId());
+            String courseName = course != null ? course.getName() : "Unknown Course";
+            System.out.print("Are you sure you want to delete the " + courseName + " session? (y/N): ");
+            String confirm = scanner.nextLine().trim().toLowerCase();
+            
+            if (confirm.equals("y") || confirm.equals("yes")) {
+                sessions.remove(index);
+                System.out.println("✅ Study session deleted successfully.");
+            } else {
+                System.out.println("Deletion cancelled.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number.");
+        }
+    }
+    // ===== UTILITY METHODS =====
+    private static Course selectCourse() {
+        System.out.println("\nSelect a course:");
+        for (int i = 0; i < courses.size(); i++) {
+            System.out.println((i + 1) + ". " + courses.get(i));
+        }
+        System.out.print("Course number: ");
+        
+        try {
+            int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+            if (index < 0 || index >= courses.size()) {
+                System.out.println("Invalid course selection.");
+                return null;
+            }
+            return courses.get(index);
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a number.");
             return null;
-        });
-
-        dialog.showAndWait().ifPresent(session -> {
-            studySessions.add(session);
-            updateDashboard();
-        });
-    }
-
-    private void updateDashboard() {
-        dashboardBox.getChildren().removeIf(node -> node instanceof ListView);
-
-        ListView<String> listView = new ListView<>();
-        for (Assignment a : assignments) {
-            listView.getItems().add("Assignment: " + a);
         }
-        for (StudySession s : studySessions) {
-            listView.getItems().add("Study Session: " + s);
-        }
-
-        dashboardBox.getChildren().add(listView);
     }
-
-    private void showAlert(String msg) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setContentText(msg);
-        alert.showAndWait();
+    private static Course findCourseById(String courseId) {
+        return courses.stream()
+            .filter(course -> course.getId().equals(courseId))
+            .findFirst()
+            .orElse(null);
     }
 }
